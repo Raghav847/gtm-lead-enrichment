@@ -1,5 +1,16 @@
 from copy import deepcopy
 from datetime import datetime, UTC
+import math
+
+
+def _normalize_scalar(value: object) -> str:
+    if value is None:
+        return ""
+
+    if isinstance(value, float) and math.isnan(value):
+        return ""
+
+    return str(value).strip()
 
 
 def normalize_input_lead(lead: dict) -> dict:
@@ -8,13 +19,13 @@ def normalize_input_lead(lead: dict) -> dict:
     can rely on consistent keys and trimmed string values.
     """
     return {
-        "name": str(lead.get("name", "")).strip(),
-        "email": str(lead.get("email", "")).strip(),
-        "company": str(lead.get("company", "")).strip(),
-        "property_address": str(lead.get("property_address", "")).strip(),
-        "city": str(lead.get("city", "")).strip(),
-        "state": str(lead.get("state", "")).strip(),
-        "country": str(lead.get("country", "")).strip(),
+        "name": _normalize_scalar(lead.get("name", "")),
+        "email": _normalize_scalar(lead.get("email", "")),
+        "company": _normalize_scalar(lead.get("company", "")),
+        "property_address": _normalize_scalar(lead.get("property_address", "")),
+        "city": _normalize_scalar(lead.get("city", "")),
+        "state": _normalize_scalar(lead.get("state", "")),
+        "country": _normalize_scalar(lead.get("country", "")),
     }
 
 

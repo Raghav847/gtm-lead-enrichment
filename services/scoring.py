@@ -72,10 +72,25 @@ def _score_label(value: int) -> str:
     return "Low"
 
 
+def _parse_population(population: object) -> int | None:
+    if isinstance(population, (int, float)):
+        return int(population)
+
+    text = _to_text(population).replace(",", "")
+
+    if not text:
+        return None
+
+    try:
+        return int(float(text))
+    except ValueError:
+        return None
+
+
 def score_lead(processed_lead: dict) -> dict:
     """
-    Score how ready a lead is for enrichment and outreach based on
-    raw input quality before API enrichment is added.
+    Score how ready a lead is for enrichment and outreach using
+    raw input quality plus any available enrichment signals.
     """
     lead_input = processed_lead.get("input", {})
 
@@ -170,6 +185,34 @@ def score_lead(processed_lead: dict) -> dict:
         reasons.append("Lead has enough context for downstream outreach drafting.")
     else:
         reasons.append("Lead needs stronger contact and location context for outreach.")
+
+    demographics = processed_lead.get("enriched_data", {}).get("demographics", {})
+    datausa = demographics.get("datausa", {})
+    population = _parse_population(datausa.get("population"))
+    datausa_status = datausa.get("status")
+
+    if datausa_status == "success" and population is not None:
+        if population >= 10_000_000:
+            value += 15
+            reasons.append("DataUSA shows this lead is in a very large state-level market.")
+        elif population >= 5_000_000:
+            value += 12
+            reasons.append("DataUSA shows this lead is in a large state-level market.")
+        elif population >= 1_000_000:
+            value += 8
+            reasons.append("DataUSA shows this lead is in a meaningful state-level market.")
+        else:
+            value += 4
+            reasons.append("DataUSA population signal is available, but the state market appears smaller.")
+    elif datausa_status == "success":
+        reasons.append("DataUSA returned a population signal, but it could not be parsed.")
+    elif datausa_status == "skipped":
+        reason = datausa.get("reason", "population enrichment was skipped")
+        reasons.append(f"DataUSA state population enrichment was skipped: {reason}")
+    elif datausa_status == "error":
+        reasons.append("DataUSA population signal was unavailable due to an API error.")
+    else:
+        reasons.append("DataUSA population signal was unavailable, so market-size scoring was not applied.")
 
     value = min(value, 100)
 
