@@ -1,20 +1,28 @@
+from services.schema import build_empty_processed_lead
+from services.scoring import score_lead
+from services.insights import generate_sales_insights
+from services.email_writer import generate_draft_email
 
-def process_lead(lead):
-    #step1: enrich
-    enriched = {}
 
-    #step2: score
-    score = 0
+def process_lead(lead: dict) -> dict:
+    """
+       Main orchestration function for processing one lead.
+       This version uses:
+       - normalized schema
+       - basic scoring
+       - basic insights
+       - template email generation
 
-    #step3: insights
-    insights = []
+       Later we will add API enrichment before scoring.
+       """
+    processed_lead = build_empty_processed_lead(lead)
 
-    #step4: email
-    email = ""
+    try:
+        processed_lead["score"] = score_lead(processed_lead)
+        processed_lead["sales_insights"] = generate_sales_insights(processed_lead)
+        processed_lead["draft_email"] = generate_draft_email(processed_lead)
+    except Exception as exc:
+        processed_lead["meta"]["status"] = "error"
+        processed_lead["meta"]["errors"].append(str(exc))
 
-    return {
-        "enriched": enriched,
-        "score": score,
-        "insights": insights,
-        "email": email
-    }
+    return processed_lead
