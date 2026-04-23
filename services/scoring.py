@@ -65,9 +65,9 @@ def _is_valid_email(email: str) -> bool:
 
 
 def _score_label(value: int) -> str:
-    if value >= 80:
+    if value >= 75:
         return "High"
-    if value >= 50:
+    if value >= 45:
         return "Medium"
     return "Low"
 
@@ -127,7 +127,7 @@ def score_lead(processed_lead: dict) -> dict:
     reasons = []
 
     if valid_email:
-        value += 15
+        value += 12
         reasons.append("Valid contact email is available.")
     elif email:
         reasons.append("Contact email is present but does not appear valid.")
@@ -135,53 +135,53 @@ def score_lead(processed_lead: dict) -> dict:
         reasons.append("Contact email is missing.")
 
     if name:
-        value += 5
+        value += 4
         reasons.append("Contact name is available.")
 
     if company:
-        value += 10
+        value += 8
         reasons.append("Company name is available.")
 
     if property_address:
-        value += 15
+        value += 10
         reasons.append("Property address supports location-based enrichment.")
 
     if city:
-        value += 5
+        value += 4
         reasons.append("City is available for local market research.")
 
     if state:
-        value += 5
+        value += 4
         reasons.append("State or region is available for geographic segmentation.")
 
     if country:
-        value += 5
+        value += 3
         reasons.append("Country is available for regional routing.")
 
     if not has_location:
         reasons.append("Location data is too sparse for strong market enrichment.")
 
     if not placeholder_fields:
-        value += 10
+        value += 5
         reasons.append("Provided fields avoid placeholder values such as N/A or unknown.")
     else:
         field_list = ", ".join(placeholder_fields)
         reasons.append(f"Placeholder values detected in {field_list}.")
 
     if meaningful_field_count >= 4:
-        value += 10
+        value += 5
         reasons.append("Lead includes enough usable fields after cleanup.")
     else:
         reasons.append("Lead has too few usable fields after cleanup.")
 
     if company and has_location:
-        value += 10
+        value += 5
         reasons.append("Company and location data are both present for enrichment.")
     else:
         reasons.append("Reliable enrichment needs both company and location context.")
 
     if valid_email and (name or company) and location_field_count >= 2:
-        value += 10
+        value += 5
         reasons.append("Lead has enough context for downstream outreach drafting.")
     else:
         reasons.append("Lead needs stronger contact and location context for outreach.")
@@ -213,6 +213,30 @@ def score_lead(processed_lead: dict) -> dict:
         reasons.append("DataUSA population signal was unavailable due to an API error.")
     else:
         reasons.append("DataUSA population signal was unavailable, so market-size scoring was not applied.")
+
+    # API enrichment: NewsAPI context signal
+    news = processed_lead.get("enriched_data", {}).get("news", {})
+    articles = news.get("articles", [])
+    news_status = news.get("status")
+    news_query = _to_text(news.get("query")).lower()
+    normalized_company = company.lower()
+
+    if news_status == "success" and articles:
+        if normalized_company and f'"{normalized_company}"' in news_query:
+            value += 10
+            reasons.append("Recent company-specific news context is available for personalized outreach.")
+        else:
+            value += 6
+            reasons.append("Recent location-based market news context is available for personalized outreach.")
+    elif news_status == "no_results":
+        reasons.append("NewsAPI did not find relevant recent coverage for this lead.")
+    elif news_status == "skipped":
+        reason = news.get("reason", "news enrichment was skipped")
+        reasons.append(f"NewsAPI enrichment was skipped: {reason}")
+    elif news_status == "error":
+        reasons.append("NewsAPI enrichment was unavailable due to an API error.")
+    else:
+        reasons.append("No recent news context was found for this lead.")
 
     value = min(value, 100)
 

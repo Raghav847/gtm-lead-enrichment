@@ -25,9 +25,51 @@ if uploaded_file:
 
     for idx, result in enumerate(results, start=1):
         st.markdown(f"## Lead {idx}")
+        demographics = result["enriched_data"].get("demographics", {})
+        datausa = demographics.get("datausa", {})
+        news = result["enriched_data"].get("news", {})
 
         st.write("### Input")
         st.json(result["input"])
+
+        st.write("### Enrichment")
+
+        with st.expander("DataUSA", expanded=True):
+            st.json(datausa)
+
+        with st.expander("NewsAPI", expanded=True):
+            st.write(f"Status: `{news.get('status', 'unknown')}`")
+
+            if news.get("reason"):
+                st.write(f"Reason: {news['reason']}")
+
+            if news.get("query"):
+                st.write(f"Selected query: `{news['query']}`")
+
+            attempted_queries = news.get("attempted_queries", [])
+            if attempted_queries:
+                st.write("Attempted queries")
+                st.json(attempted_queries)
+
+            articles = news.get("articles", [])
+            if articles:
+                st.write("Matched articles")
+                for article_idx, article in enumerate(articles, start=1):
+                    title = article.get("title") or "Untitled article"
+                    source = article.get("source") or "Unknown source"
+                    published_at = article.get("published_at") or "Unknown date"
+
+                    st.markdown(f"**{article_idx}. {title}**")
+                    st.write(f"Source: {source}")
+                    st.write(f"Published: {published_at}")
+
+                    if article.get("description"):
+                        st.write(article["description"])
+
+                    if article.get("url"):
+                        st.write(article["url"])
+            else:
+                st.write("No relevant articles returned.")
 
         st.write("### Score")
         st.json(result["score"])

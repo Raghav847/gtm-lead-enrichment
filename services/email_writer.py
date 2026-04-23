@@ -62,10 +62,21 @@ def generate_draft_email(processed_lead: dict) -> str:
     else:
         location_line = "I noticed you manage a property in an active market."
 
+    news = processed_lead.get("enriched_data", {}).get("news", {})
+    articles = news.get("articles", [])
+    news_status = news.get("status")
+
+    if news_status == "success" and articles and articles[0].get("title"):
+        news_line = f"I also noticed recent news related to your market: {articles[0]['title']}."
+    else:
+        news_line = ""
+
+    context_line = " ".join(part for part in (location_line, news_line) if part)
+
     return (
         f"Hi {name},\n\n"
         f"I’m reaching out because {company} may be a strong fit for solutions that help "
-        f"streamline property operations and improve response workflows. {location_line}\n\n"
+        f"streamline property operations and improve response workflows. {context_line}\n\n"
         f"I’d love to share how teams in similar markets are using automation to improve "
         f"leasing and resident communication.\n\n"
         f"Would you be open to a quick conversation?\n\n"

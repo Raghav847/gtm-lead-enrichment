@@ -61,6 +61,26 @@ def generate_sales_insights(processed_lead: dict) -> list[str]:
     year = datausa.get("year")
     datausa_state = _clean_text(datausa.get("state")) or state
     datausa_status = datausa.get("status")
+    news = processed_lead.get("enriched_data", {}).get("news", {})
+    articles = news.get("articles", [])
+    news_status = news.get("status")
+
+    if news_status == "success" and articles:
+        top_article = articles[0]
+        title = top_article.get("title")
+        source = top_article.get("source")
+
+        if title and source:
+            insights.append(f"Recent news found from {source}: {title}")
+        elif title:
+            insights.append(f"Recent news found: {title}")
+    elif news_status == "no_results":
+        insights.append("No recent news was found, so outreach should rely more on market and property context.")
+    elif news_status == "skipped":
+        reason = news.get("reason", "news enrichment was skipped")
+        insights.append(f"NewsAPI enrichment was skipped: {reason}")
+    elif news_status == "error":
+        insights.append("NewsAPI enrichment could not be retrieved for this lead.")
 
     if datausa_status == "success" and population is not None and datausa_state:
         insights.append(

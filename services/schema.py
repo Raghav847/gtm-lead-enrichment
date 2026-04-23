@@ -49,7 +49,11 @@ def build_empty_processed_lead(input_lead: dict) -> dict:
             "economics": {},
             "company_context": {},
             "local_context": {},
-            "news": [],
+            "news": {
+                "source": "NewsAPI",
+                "status": "not_requested",
+                "articles": [],
+            },
         },
         "score": {
             "value": 0,
