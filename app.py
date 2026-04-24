@@ -21,6 +21,41 @@ if uploaded_file:
         result = process_lead(row.to_dict())
         results.append(result)
 
+    summary_rows = []
+
+    for result in results:
+        lead_input = result["input"]
+        score = result["score"]
+        insights = result["sales_insights"]
+
+        summary_rows.append(
+            {
+                "Name": lead_input.get("name", ""),
+                "Email": lead_input.get("email", ""),
+                "Company": lead_input.get("company", ""),
+                "City": lead_input.get("city", ""),
+                "State": lead_input.get("state", ""),
+                "Score": score.get("value", 0),
+                "Priority": score.get("label", "Low"),
+                "Top Insight": insights[0] if insights else "",
+                "Draft Email": result.get("draft_email", ""),
+            }
+        )
+
+    summary_df = pd.DataFrame(summary_rows)
+
+    st.subheader("Sales Rep Output")
+    st.dataframe(summary_df, use_container_width=True)
+
+    csv = summary_df.to_csv(index=False).encode("utf-8")
+
+    st.download_button(
+        label="Download Enriched Leads CSV",
+        data=csv,
+        file_name="enriched_leads.csv",
+        mime="text/csv",
+    )
+
     st.subheader("Processed Leads")
 
     for idx, result in enumerate(results, start=1):
