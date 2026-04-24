@@ -48,7 +48,12 @@ def build_empty_processed_lead(input_lead: dict) -> dict:
             "demographics": {},
             "economics": {},
             "company_context": {},
-            "local_context": {},
+            "local_context": {
+                "weather": {
+                    "source": "OpenWeather",
+                    "status": "not_requested",
+                },
+            },
             "news": {
                 "source": "NewsAPI",
                 "status": "not_requested",

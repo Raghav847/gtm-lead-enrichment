@@ -2,6 +2,25 @@ import  streamlit as st
 import pandas as pd
 from main import process_lead
 
+
+def _lead_label(lead: dict) -> str:
+    name = str(lead.get("name", "")).strip()
+    company = str(lead.get("company", "")).strip()
+    city = str(lead.get("city", "")).strip()
+
+    if name and company:
+        return f"{name} at {company}"
+    if company and city:
+        return f"{company} in {city}"
+    if name:
+        return name
+    if company:
+        return company
+    if city:
+        return city
+
+    return "Unnamed lead"
+
 st.set_page_config(page_title="GTM Lead Enrichment Tool", layout="wide")
 
 st.title("GTM Lead Enrichment Tool")
@@ -16,14 +35,27 @@ if uploaded_file:
     st.dataframe(df)
 
     results = []
+    summary_rows = []
+    total_leads = len(df)
 
-    for _, row in df.iterrows():
-        result = process_lead(row.to_dict())
+    status_box = st.empty()
+    progress_bar = st.progress(0)
+    preview_box = st.empty()
+
+    if total_leads:
+        status_box.info(f"Starting enrichment for {total_leads} lead(s)...")
+
+    for idx, (_, row) in enumerate(df.iterrows(), start=1):
+        lead_dict = row.to_dict()
+        lead_label = _lead_label(lead_dict)
+
+        status_box.info(
+            f"Processing lead {idx} of {total_leads}: {lead_label}"
+        )
+
+        result = process_lead(lead_dict)
         results.append(result)
 
-    summary_rows = []
-
-    for result in results:
         lead_input = result["input"]
         score = result["score"]
         insights = result["sales_insights"]
@@ -41,6 +73,13 @@ if uploaded_file:
                 "Draft Email": result.get("draft_email", ""),
             }
         )
+
+        progress_bar.progress(idx / total_leads)
+        preview_box.write("### Processing Preview")
+        preview_box.dataframe(pd.DataFrame(summary_rows), use_container_width=True)
+
+    if total_leads:
+        status_box.success(f"Finished processing {total_leads} lead(s).")
 
     summary_df = pd.DataFrame(summary_rows)
 
@@ -61,8 +100,10 @@ if uploaded_file:
     for idx, result in enumerate(results, start=1):
         st.markdown(f"## Lead {idx}")
         demographics = result["enriched_data"].get("demographics", {})
+        local_context = result["enriched_data"].get("local_context", {})
         datausa = demographics.get("datausa", {})
         news = result["enriched_data"].get("news", {})
+        weather = local_context.get("weather", {})
 
         st.write("### Input")
         st.json(result["input"])
@@ -105,6 +146,32 @@ if uploaded_file:
                         st.write(article["url"])
             else:
                 st.write("No relevant articles returned.")
+
+        with st.expander("OpenWeather", expanded=True):
+            st.write(f"Status: `{weather.get('status', 'unknown')}`")
+
+            if weather.get("reason"):
+                st.write(f"Reason: {weather['reason']}")
+
+            if weather.get("location_query"):
+                st.write(f"Location query: `{weather['location_query']}`")
+
+            if weather.get("status") == "success":
+                weather_summary = {
+                    "city": weather.get("city"),
+                    "country": weather.get("country"),
+                    "condition": weather.get("condition"),
+                    "description": weather.get("description"),
+                    "temperature_f": weather.get("temperature_f"),
+                    "feels_like_f": weather.get("feels_like_f"),
+                    "humidity": weather.get("humidity"),
+                    "wind_speed": weather.get("wind_speed"),
+                }
+                st.json(weather_summary)
+
+            if weather.get("raw"):
+                st.write("Raw weather payload")
+                st.json(weather["raw"])
 
         st.write("### Score")
         st.json(result["score"])

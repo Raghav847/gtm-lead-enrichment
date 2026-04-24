@@ -1,3 +1,6 @@
+from services.llm_email_writer import generate_llm_draft_email
+
+
 PLACEHOLDER_VALUES = {
     "n/a",
     "na",
@@ -32,7 +35,65 @@ def _parse_population(population: object) -> int | None:
         return None
 
 
-def generate_draft_email(processed_lead: dict) -> str:
+def _format_temperature(value: object) -> str:
+    if isinstance(value, (int, float)):
+        return f"{round(float(value))}F"
+
+    text = _clean_text(value)
+    if not text:
+        return ""
+
+    try:
+        return f"{round(float(text))}F"
+    except ValueError:
+        return text
+
+
+def _parse_number(value: object) -> float | None:
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    text = _clean_text(value).replace(",", "")
+    if not text:
+        return None
+
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def _build_weather_line(weather: dict, fallback_city: str) -> str:
+    weather_status = weather.get("status")
+    if weather_status != "success":
+        return ""
+
+    weather_city = _clean_text(weather.get("city")) or fallback_city
+    weather_condition = _clean_text(weather.get("condition")).lower()
+    weather_description = _clean_text(weather.get("description"))
+    weather_temp = _format_temperature(weather.get("temperature_f"))
+    wind_speed = _parse_number(weather.get("wind_speed"))
+
+    if weather_condition in {"thunderstorm", "snow", "rain"} and weather_city:
+        detail = weather_description or weather_condition
+        return f"Current conditions in {weather_city} include {detail}, which may affect onsite operations."
+
+    if weather_temp:
+        try:
+            temp_value = float(weather_temp[:-1])
+        except ValueError:
+            temp_value = None
+
+        if temp_value is not None and (temp_value >= 90 or temp_value <= 35) and weather_city:
+            return f"Current conditions in {weather_city} are around {weather_temp}, which may affect day-to-day property operations."
+
+    if wind_speed is not None and wind_speed >= 20 and weather_city:
+        return f"Current wind conditions in {weather_city} may also be relevant for property operations."
+
+    return ""
+
+
+def _generate_template_draft_email(processed_lead: dict) -> str:
     """
     Generate a lightweight personalized outreach draft.
     """
@@ -71,7 +132,10 @@ def generate_draft_email(processed_lead: dict) -> str:
     else:
         news_line = ""
 
-    context_line = " ".join(part for part in (location_line, news_line) if part)
+    weather = processed_lead.get("enriched_data", {}).get("local_context", {}).get("weather", {})
+    weather_line = _build_weather_line(weather, _clean_text(lead_input.get("city")))
+
+    context_line = " ".join(part for part in (location_line, weather_line, news_line) if part)
 
     return (
         f"Hi {name},\n\n"
@@ -83,3 +147,11 @@ def generate_draft_email(processed_lead: dict) -> str:
         f"Best,\n"
         f"[Your Name]"
     )
+
+
+def generate_draft_email(processed_lead: dict) -> str:
+    llm_email = generate_llm_draft_email(processed_lead).strip()
+    if llm_email:
+        return llm_email
+
+    return _generate_template_draft_email(processed_lead)

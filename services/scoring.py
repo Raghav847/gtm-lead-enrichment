@@ -87,6 +87,37 @@ def _parse_population(population: object) -> int | None:
         return None
 
 
+def _parse_number(value: object) -> float | None:
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    text = _to_text(value).replace(",", "")
+    if not text:
+        return None
+
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def _weather_signal_strength(weather: dict) -> tuple[int, str] | None:
+    weather_condition = _to_text(weather.get("condition")).lower()
+    temperature_f = _parse_number(weather.get("temperature_f"))
+    wind_speed = _parse_number(weather.get("wind_speed"))
+
+    if weather_condition in {"thunderstorm", "snow", "rain"}:
+        return 4, "Current weather may affect onsite operations and creates a timely outreach angle."
+
+    if temperature_f is not None and (temperature_f >= 90 or temperature_f <= 35):
+        return 3, "Current temperature suggests unusual local operating conditions worth mentioning in outreach."
+
+    if wind_speed is not None and wind_speed >= 20:
+        return 2, "Current wind conditions may be relevant for onsite operations and maintenance conversations."
+
+    return None
+
+
 def score_lead(processed_lead: dict) -> dict:
     """
     Score how ready a lead is for enrichment and outreach using
@@ -237,6 +268,23 @@ def score_lead(processed_lead: dict) -> dict:
         reasons.append("NewsAPI enrichment was unavailable due to an API error.")
     else:
         reasons.append("No recent news context was found for this lead.")
+
+    weather = processed_lead.get("enriched_data", {}).get("local_context", {}).get("weather", {})
+    weather_status = weather.get("status")
+
+    if weather_status == "success":
+        weather_signal = _weather_signal_strength(weather)
+        if weather_signal:
+            weather_points, weather_reason = weather_signal
+            value += weather_points
+            reasons.append(weather_reason)
+        else:
+            reasons.append("Current local weather context is available, but conditions do not materially change lead priority.")
+    elif weather_status == "skipped":
+        reason = weather.get("reason", "weather enrichment was skipped")
+        reasons.append(f"OpenWeather enrichment was skipped: {reason}")
+    elif weather_status == "error":
+        reasons.append("OpenWeather enrichment was unavailable due to an API error.")
 
     value = min(value, 100)
 
