@@ -15,6 +15,7 @@ env/
 # Environment and local secrets
 .env
 .env.*
+credentials/
 
 # Build and packaging artifacts
 build/
