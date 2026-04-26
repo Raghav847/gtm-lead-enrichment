@@ -1,0 +1,7 @@
+name,email,company,property_address,city,state,country,status,score,priority,top_insight,draft_email,processed_at,error_message
+John Doe,john@example.com,Acme Corp,123 Main St,Seattle,WA,USA,new,,,,,,
+Jane Smith,jane@example.com,BuildCo,456 Pine St,San Francisco,CA,USA,,,,,,,
+Mike Brown,mike@realestate.com,Urban Living,789 Oak Ave,Austin,TX,USA,new,,,,,,
+Sara Lee,,Skyline Mgmt,321 Elm St,New York,NY,USA,,,,,,,
+Test User,invalid-email,TestCo,,Chicago,IL,USA,new,,,,,,
+Already Done,done@example.com,DoneCorp,999 Done St,Boston,MA,USA,done,85,High,Test insight,Test email,2026-01-01T00:00:00,

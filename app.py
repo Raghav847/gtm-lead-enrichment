@@ -1,5 +1,6 @@
 import  streamlit as st
 import pandas as pd
+from integrations.google_sheets import get_worksheet, read_lead_rows, write_processed_lead, update_row_status
 from main import process_lead
 
 
@@ -21,67 +22,27 @@ def _lead_label(lead: dict) -> str:
 
     return "Unnamed lead"
 
-st.set_page_config(page_title="GTM Lead Enrichment Tool", layout="wide")
 
-st.title("GTM Lead Enrichment Tool")
-st.write("Upload a CSV of leads to begin")
+def _build_summary_row(result: dict) -> dict:
+    lead_input = result["input"]
+    score = result["score"]
+    insights = result["sales_insights"]
 
-uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
+    return {
+        "Name": lead_input.get("name", ""),
+        "Email": lead_input.get("email", ""),
+        "Company": lead_input.get("company", ""),
+        "City": lead_input.get("city", ""),
+        "State": lead_input.get("state", ""),
+        "Score": score.get("value", 0),
+        "Priority": score.get("label", "Low"),
+        "Top Insight": insights[0] if insights else "",
+        "Draft Email": result.get("draft_email", ""),
+    }
 
-if uploaded_file:
-    df = pd.read_csv(uploaded_file)
 
-    st.subheader("Raw Leads")
-    st.dataframe(df)
-
-    results = []
-    summary_rows = []
-    total_leads = len(df)
-
-    status_box = st.empty()
-    progress_bar = st.progress(0)
-    preview_box = st.empty()
-
-    if total_leads:
-        status_box.info(f"Starting enrichment for {total_leads} lead(s)...")
-
-    for idx, (_, row) in enumerate(df.iterrows(), start=1):
-        lead_dict = row.to_dict()
-        lead_label = _lead_label(lead_dict)
-
-        status_box.info(
-            f"Processing lead {idx} of {total_leads}: {lead_label}"
-        )
-
-        result = process_lead(lead_dict)
-        results.append(result)
-
-        lead_input = result["input"]
-        score = result["score"]
-        insights = result["sales_insights"]
-
-        summary_rows.append(
-            {
-                "Name": lead_input.get("name", ""),
-                "Email": lead_input.get("email", ""),
-                "Company": lead_input.get("company", ""),
-                "City": lead_input.get("city", ""),
-                "State": lead_input.get("state", ""),
-                "Score": score.get("value", 0),
-                "Priority": score.get("label", "Low"),
-                "Top Insight": insights[0] if insights else "",
-                "Draft Email": result.get("draft_email", ""),
-            }
-        )
-
-        progress_bar.progress(idx / total_leads)
-        preview_box.write("### Processing Preview")
-        preview_box.dataframe(pd.DataFrame(summary_rows), use_container_width=True)
-
-    if total_leads:
-        status_box.success(f"Finished processing {total_leads} lead(s).")
-
-    summary_df = pd.DataFrame(summary_rows)
+def _render_processed_results(results: list[dict]) -> None:
+    summary_df = pd.DataFrame([_build_summary_row(result) for result in results])
 
     st.subheader("Sales Rep Output")
     st.dataframe(summary_df, use_container_width=True)
@@ -187,3 +148,94 @@ if uploaded_file:
         st.json(result["meta"])
 
         st.divider()
+
+st.set_page_config(page_title="GTM Lead Enrichment Tool", layout="wide")
+
+st.title("GTM Lead Enrichment Tool")
+st.write("Upload a CSV of leads to begin")
+
+with st.expander("Google Sheets Automation", expanded=False):
+    sheet_name = st.text_input("Spreadsheet name", value="gtm_lead_enrichment")
+    worksheet_name = st.text_input("Worksheet name (optional)", value="")
+
+    if st.button("Process New Sheet Leads", use_container_width=True):
+        sheet_status = st.empty()
+        sheet_progress = st.progress(0)
+        sheet_preview = st.empty()
+
+        try:
+            worksheet = get_worksheet(sheet_name, worksheet_name or None)
+            pending_rows = read_lead_rows(sheet_name, worksheet_name or None, status_filter="new")
+
+            if not pending_rows:
+                sheet_status.info("No new sheet leads found.")
+            else:
+                sheet_status.info(f"Found {len(pending_rows)} new sheet lead(s).")
+                processed_results = []
+                preview_rows = []
+
+                for idx, row in enumerate(pending_rows, start=1):
+                    lead_input = row["lead_input"]
+                    row_number = row["row_number"]
+                    lead_label = _lead_label(lead_input)
+
+                    sheet_status.info(
+                        f"Processing sheet row {row_number} ({idx} of {len(pending_rows)}): {lead_label}"
+                    )
+                    update_row_status(worksheet, row_number, "processing")
+
+                    result = process_lead(lead_input)
+                    write_processed_lead(worksheet, row_number, result)
+
+                    processed_results.append(result)
+                    preview_rows.append(_build_summary_row(result))
+
+                    sheet_progress.progress(idx / len(pending_rows))
+                    sheet_preview.write("### Sheet Processing Preview")
+                    sheet_preview.dataframe(pd.DataFrame(preview_rows), use_container_width=True)
+
+                sheet_status.success(f"Finished processing {len(processed_results)} sheet lead(s).")
+                _render_processed_results(processed_results)
+        except Exception as exc:
+            sheet_status.error(f"Google Sheets automation failed: {exc}")
+
+uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
+
+if uploaded_file:
+    df = pd.read_csv(uploaded_file)
+
+    st.subheader("Raw Leads")
+    st.dataframe(df)
+
+    results = []
+    summary_rows = []
+    total_leads = len(df)
+
+    status_box = st.empty()
+    progress_bar = st.progress(0)
+    preview_box = st.empty()
+
+    if total_leads:
+        status_box.info(f"Starting enrichment for {total_leads} lead(s)...")
+
+    for idx, (_, row) in enumerate(df.iterrows(), start=1):
+        lead_dict = row.to_dict()
+        lead_label = _lead_label(lead_dict)
+
+        status_box.info(
+            f"Processing lead {idx} of {total_leads}: {lead_label}"
+        )
+
+        result = process_lead(lead_dict)
+        results.append(result)
+
+        summary_rows.append(_build_summary_row(result))
+
+        progress_bar.progress(idx / total_leads)
+        preview_box.write("### Processing Preview")
+        preview_box.dataframe(pd.DataFrame(summary_rows), use_container_width=True)
+
+    if total_leads:
+        status_box.success(f"Finished processing {total_leads} lead(s).")
+
+    _render_processed_results(results)
