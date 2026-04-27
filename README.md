@@ -1,5 +1,7 @@
 # GTM Lead Enrichment Tool
 
+Video walkthrough: https://drive.google.com/file/d/14DNUZGwadBnb7bqQ0OSEW60tMpxO1EUH/view?usp=sharing
+
 Streamlit-based MVP for automating inbound lead enrichment for SDRs using public APIs.
 
 ## What The Tool Does
@@ -249,7 +251,7 @@ Assignment requirement status:
 - automation via trigger or schedule: yes
 - rollout project plan: yes, documented here
 - code/script: yes
-- explanation video: not included in repo and still needs to be recorded manually
+- explanation video: https://drive.google.com/file/d/14DNUZGwadBnb7bqQ0OSEW60tMpxO1EUH/view?usp=sharing
 
 ## Environment Variables
 
