@@ -152,7 +152,7 @@ def _render_processed_results(results: list[dict]) -> None:
 st.set_page_config(page_title="GTM Lead Enrichment Tool", layout="wide")
 
 st.title("GTM Lead Enrichment Tool")
-st.write("Upload a CSV of leads to begin")
+st.write("Upload a CSV or trigger Google Sheets enrichment to process inbound leads.")
 
 with st.expander("Google Sheets Automation", expanded=False):
     sheet_name = st.text_input("Spreadsheet name", value="gtm_lead_enrichment")
